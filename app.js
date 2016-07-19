@@ -9,6 +9,9 @@ var bodyParser = require("body-parser");
 var _ = require("underscore");
 
 
+var db = require("./db.js");
+
+
 middleware = require("./middleware.js");
 var app = express();
 
@@ -56,6 +59,27 @@ app.get("/todos",
 app.get("/todos/:id",
 	function(req, resp) {
 		var todoId = parseInt(req.params.id, 10);
+		db.todo.findById(todoId).then(function(todo) {
+			if (todo) {
+				resp.status(200).json(todo.toJSON());
+			} else {
+				console.log("Error");
+				resp.status(404).send();
+			}
+
+		}).catch(function(error) {
+			console.log("Error");
+			resp.status(404).send();
+
+		});
+
+	}
+);
+
+//GET an individual todo with ID=:id
+app.get("/todosStatic/:id",
+	function(req, resp) {
+		var todoId = parseInt(req.params.id, 10);
 		var matchedTodo;
 
 		//commented for the underscore's usage of _.findWhere() 
@@ -84,7 +108,7 @@ app.get("/todos/:id",
 );
 
 //POST create a new todo item
-app.post("/todos",
+app.post("/todosStatic",
 	function(req, resp) {
 		// using body-parser provides the feature of req.body to be used
 		var body = req.body;
@@ -100,15 +124,35 @@ app.post("/todos",
 	}
 );
 
+app.post("/todos",
+	function(req, resp) {
+		// using body-parser provides the feature of req.body to be used
+		var body = req.body;
+		db.todo.create({
+			description: body.description,
+			completed: body.completed
+		}).then(function(todo) {
+			resp.status(200).json(todo.toJSON());
+		}).
+		catch(function(error) {
+			resp.status(400).json(error.toJSON());
+		})
+	}
+);
+
 
 //if you dont provide any route for the "/" , this would get autometically invoked
 // __dirname  => is an predefined variable within node which gives the path of current working directory
 app.use(express.static(__dirname + "/public"));
 
-app.listen(port, function(error, success) {
-	if (error) {
-		console.log("server startup failed");
-	} else {
-		console.log("server is started at port " + port + " press [ctrl+c] to exit!!");
-	}
-});
+
+db.sequelize.sync().then(function() {
+	app.listen(port, function(error, success) {
+		if (error) {
+			console.log("server startup failed");
+		} else {
+			console.log("server is started at port " + port + " press [ctrl+c] to exit!!");
+		}
+	});
+
+})
