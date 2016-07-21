@@ -11,30 +11,20 @@ var _ = require("underscore");
 
 var db = require("./db.js");
 
+var bcrypt = require('bcrypt-nodejs');
 
-middleware = require("./middleware.js");
+
+var requireauthMW = require("./requireauth-mw.js")(db);
+
 var app = express();
 
 
 // process.env.PORT is the port number set by Heroku..for local server the 9000 port would be used
 // as process.env.PORT is not supplied in the local env
-var port = process.env.PORT || 9000;
-
-var nextTodoId = 1;
-var todos = [];
+var PORT = process.env.PORT || 9000;
 
 // using bodyparser as a middleware
 app.use(bodyParser.json());
-
-
-
-/*app.get("/",
-	function(req,resp)
-	{
-		resp.send("My First Express App");
-	}
-);*/
-
 
 
 //these are applicaiton level middlewares
@@ -43,101 +33,85 @@ app.use(bodyParser.json());
 
 
 // the following is an example of path specific middleware(pathSpecificLogger), which is used as a second argument of the route difinition
-app.get("/about", middleware.pathSpecificLogger, function(req, resp) {
-	resp.send("About items are listed here");
+app.get("/about", function (req, resp) {
+    resp.send("About items are listed here");
 });
 
-//GET all todo items
-app.get("/todos",
-	function(req, resp) {
-		// instead of sending JSON.stringify() use the readymade function of resp.json()
-		resp.json(todos);
-	}
-);
+
 
 //GET an individual todo with ID=:id
-app.get("/todos/:id",
-	function(req, resp) {
-		var todoId = parseInt(req.params.id, 10);
-		db.todo.findById(todoId).then(function(todo) {
-			if (todo) {
-				resp.status(200).json(todo.toJSON());
-			} else {
-				console.log("Error");
-				resp.status(404).send();
-			}
+app.get("/todos/:id", requireauthMW.requires,
+    function (req, resp) {
+        var todoId = parseInt(req.params.id, 10);
+        db.todo.findById(todoId).then(function (todo) {
+            if (todo) {
+                resp.status(200).json(todo.toJSON());
+            } else {
+                console.log("Error");
+                resp.status(404).send();
+            }
 
-		}).catch(function(error) {
-			console.log("Error");
-			resp.status(404).send();
+        }).catch(function (error) {
+            console.log("Error");
+            resp.status(404).send();
 
-		});
 
-	}
+        });
+
+    }
 );
 
-//GET an individual todo with ID=:id
-app.get("/todosStatic/:id",
-	function(req, resp) {
-		var todoId = parseInt(req.params.id, 10);
-		var matchedTodo;
 
-		//commented for the underscore's usage of _.findWhere() 
-		/*todos.forEach(function(todo)
-		{
-			if(todoId===todo.id)
-			{
-				matchedTodo=todo;
-			}
-		});*/
-
-
-		// using underscore for finding the element
-		matchedTodo = _.findWhere(todos, {
-			id: todoId
-		});
-
-		if (matchedTodo) {
-			resp.json(matchedTodo);
-		} else {
-			console.log("Reqeust:" + new Date().toString() + " => " + req.method + " " + req.originalUrl + " could not be served the todo item with id " + todoId + " does not exist!!");
-			resp.status(404).send();
-
-		}
-	}
+// create new todo item
+app.post("/todos", requireauthMW.requires,
+    function (req, resp) {
+        // using body-parser provides the feature of req.body to be used
+        var body = req.body;
+        db.todo.create({
+            description: body.description,
+            completed: body.completed
+        }).then(function (todo) {
+            resp.status(200).json(todo.toJSON());
+        }).
+            catch(function (error) {
+                resp.status(400).json(error);
+            })
+    }
 );
 
-//POST create a new todo item
-app.post("/todosStatic",
-	function(req, resp) {
-		// using body-parser provides the feature of req.body to be used
-		var body = req.body;
 
-
-		// adding id with the JSON sent by user/client
-		body.id = nextTodoId++;
-
-		// add new todo in todos array		
-		todos.push(body);
-		console.log(body);
-		resp.json(body);
-	}
+// create new todo item
+app.post("/users",
+    function (req, resp) {
+        // using body-parser provides the feature of req.body to be used
+        var body = _.pick(req.body, 'email', 'password');
+        db.user.create(body).then(function (user) {
+            resp.status(200).json(user.toBareUser());
+        }).
+            catch(function (error) {
+                resp.status(400).json(error);
+            })
+    }
 );
 
-app.post("/todos",
-	function(req, resp) {
-		// using body-parser provides the feature of req.body to be used
-		var body = req.body;
-		db.todo.create({
-			description: body.description,
-			completed: body.completed
-		}).then(function(todo) {
-			resp.status(200).json(todo.toJSON());
-		}).
-		catch(function(error) {
-			resp.status(400).json(error.toJSON());
-		})
-	}
+app.post("/users/login",
+    function (req, resp) {
+
+        // using body-parser provides the feature of req.body to be used
+        var body = _.pick(req.body, 'email', 'password');
+        db.user.authenticate(body).then(
+            function (user) {
+                resp.header('AUTH', user.generateJwtToken('Authentication')).status(200).json(user)
+            },
+            function () {
+                resp.status(401).send();
+            }).catch(function (err) {
+                console.log(err);
+                resp.status(500).send();
+            })
+
+        
+    }
 );
 
 
@@ -146,13 +120,13 @@ app.post("/todos",
 app.use(express.static(__dirname + "/public"));
 
 
-db.sequelize.sync().then(function() {
-	app.listen(port, function(error, success) {
-		if (error) {
-			console.log("server startup failed");
-		} else {
-			console.log("server is started at port " + port + " press [ctrl+c] to exit!!");
-		}
-	});
+db.sequelize.sync().then(function () {
+    app.listen(PORT, function (error, success) {
+        if (error) {
+            console.log("server startup failed");
+        } else {
+            console.log("server is started at port " + PORT + " press [ctrl+c] to exit!!");
+        }
+    });
 
 })
