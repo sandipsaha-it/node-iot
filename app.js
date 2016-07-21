@@ -120,7 +120,7 @@ app.post("/users/login",
 app.use(express.static(__dirname + "/public"));
 
 
-db.sequelize.sync().then(function () {
+db.sequelize.sync({force:true}).then(function () {
     app.listen(PORT, function (error, success) {
         if (error) {
             console.log("server startup failed");
