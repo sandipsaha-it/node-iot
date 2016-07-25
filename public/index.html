@@ -7,7 +7,43 @@
 	</head>
 	<body>
 		
-		<h1> Hello Express </h1>
+		<script
+			  src="https://code.jquery.com/jquery-3.1.0.js"
+			  integrity="sha256-slogkvB1K3VOkzAI8QITxV3VzpOnkeNVsKvtkYLMjfk="
+			  crossorigin="anonymous"></script>
+		<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+		<script type="text/javascript">
+			var socket = io();
+			socket.on('message', function(message) {
+				$('.messages').append('<p>' + message.text + '</p>');
+			})
+			$(document).ready(function() {
+				$('#postme').click(function() {
+					socket.emit('message', {
+						text: $('#message').val()
+					});
+					$('#message').val("");
+
+				});
+				$('#message').bind("enterKey", function(e) {
+					socket.emit('message', {
+						text: $('#message').val()
+					})
+					$('#message').val("");
+				});
+				$('#message').keyup(function(e) {
+					if (e.keyCode == 13) {
+						$(this).trigger("enterKey");
+					}
+				});
+			});
+		</script>
+		<h1> Web Chat </h1>
+		<div class="messages"></div>
+		<div>
+			<input type="text" id="message" placeholder = "type your message here"/>
+			<input type="Button" id="postme" value="Post"></button>
+		</div>
 	</body>
 
 </html>

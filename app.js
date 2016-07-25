@@ -19,12 +19,18 @@ var bcrypt = require('bcrypt-nodejs');
 var requireauthMW = require("./requireauth-mw.js")(db);
 
 var app = express();
-//var http = require('http').Server(app);
-//var io = require('socket.io')(http);
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
 
-// io.on('connection', function(socket) {
-//     console.log("connection initiated from " + socket);
-// });
+io.on('connection', function(socket) {
+    console.log("connection initiated from " + (socket.toString()));
+
+    socket.on('message', function(message) {
+        console.log("message received " + message.text);
+        socket.broadcast.emit('message',message);
+    });
+})
+
 
 
 // process.env.PORT is the port number set by Heroku..for local server the 9000 port would be used
@@ -145,9 +151,9 @@ app.use(express.static(__dirname + "/public"));
 
 
 db.sequelize.sync({
-    force: true
+    //force: true
 }).then(function() {
-    app.listen(PORT, function(error, success) {
+    http.listen(PORT, function(error, success) {
         if (error) {
             console.log("server startup failed");
         } else {
