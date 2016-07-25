@@ -116,22 +116,20 @@ module.exports = function (sequelize, DataTypes) {
                     return new Promise(function (resolve, reject) {
                         try {
                             var jwtDecoded = jwt.verify(token, 'jwttokentodo#123*&');
-                            console.log("1-----" + jwtDecoded.token);
                             var bytes = crypto.AES.decrypt(jwtDecoded.token, 'cryptotokentodo#123*&');
-                            console.log("2-----" + bytes);
                             var tokenData = JSON.parse(bytes.toString(crypto.enc.Utf8));
-                            console.log("3-----" + tokenData);
                             USER.findById(tokenData.id).then(
                                 function (user) {
                                     if (user) {
                                         resolve(user)
                                     }
                                     else {
+                                        console.log("user Could not be found");
                                         reject();
                                     }
                                 },
                                 function (err) {
-                                    resject();
+                                    resject(err);
                                 }
                             )
 
@@ -140,7 +138,7 @@ module.exports = function (sequelize, DataTypes) {
                         {
                             console.log("----->>>>>" + ex, ex.stack.split("\n"));
                             
-                            reject();
+                            reject(ex);
                         }
 
                     })
